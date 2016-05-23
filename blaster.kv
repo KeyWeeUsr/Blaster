@@ -1,0 +1,82 @@
+#:kivy 1.9.2
+
+#:import dp kivy.metrics.dp
+#:import Image kivy.uix.image.Image
+<Game>:
+    Level:
+    Menu:
+<Menu>:
+    ## placeholder for background image
+    canvas:
+        Color:
+            rgba: 0, 0, 0, 1
+        Rectangle:
+            size: self.size
+            pos: self.pos
+    name: 'menu'
+    GridLayout:
+        center: self.parent.center
+        size_hint: 0.9, 0.9
+        cols: 1
+        Button:
+            text: 'Play'
+            on_release: root.start_game()
+        Button:
+            text: 'Instructions'
+        Button:
+            text: 'Settings'
+        Button:
+            text: 'Password'
+        Button:
+            text: 'Exit'
+            on_release: exit()
+        Label:
+            text: 'KeyWeeUsr, https://github.com/KeyWeeUsr'
+<Instructions@Screen>:
+<GSettings@Screen>:
+<Password@Screen>:
+<Level>:
+    name: 'level'
+    BoxLayout:
+        orientation: 'vertical'
+        BoxLayout:
+            size_hint_y: None
+            height: '30dp'
+            Label:
+                text: 'Life'
+            Label:
+                text: 'Score'
+            Label:
+                text: 'Time'
+        ScrollView:
+            id: container
+            Widget:
+                canvas:
+                    Rectangle:
+                        texture: root.texture
+                        size: self.size
+                        pos: self.pos
+                        tex_coords:
+                            [0, 0, self.width/50, 0, self.width/50,
+                            self.height/50, 0, self.height/50]
+                id: lvlwindow
+                Bomber:
+<Bomber>:
+    size_hint: None, None
+    size: 50, 50
+    pos: 50, 50
+    canvas:
+        Color:
+            rgba: 0.1, 1, 1, 1
+        Rectangle:
+            size: self.size
+            pos: self.pos
+<Wall>:
+    size_hint: None, None
+    size: 50, 50
+    source: 'wall.png'
+    text:str(self.text)
+    Label:
+        size: root.size[0]/3, root.size[1]/3
+        center: root.center
+        text: root.text

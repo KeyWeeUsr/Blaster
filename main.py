@@ -289,19 +289,20 @@ class Bomb(Wall):
             if cnt <= self.range or not where:
                 for r in xrange(len(self.app.breakable)):
                     # check if flame hits column first(blocks fire range)
+                    # up and right need to be at the bottom, or IndexError
                     try:
+                        if self.app.map[g_pos[1]][g_pos[0] - cnt] == 2:
+                            if 'left' in where:
+                                where.remove('left')
+                        if self.app.map[g_pos[1] - cnt][g_pos[0]] == 2:
+                            if 'down' in where:
+                                where.remove('down')
+                        if self.app.map[g_pos[1] + cnt][g_pos[0]] == 2:
+                            if 'up' in where:
+                                where.remove('up')
                         if self.app.map[g_pos[1]][g_pos[0] + cnt] == 2:
                             if 'right' in where:
                                 where.remove('right')
-                        elif self.app.map[g_pos[1]][g_pos[0] - cnt] == 2:
-                            if 'left' in where:
-                                where.remove('left')
-                        elif self.app.map[g_pos[1] + cnt][g_pos[0]] == 2:
-                            if 'up' in where:
-                                where.remove('up')
-                        elif self.app.map[g_pos[1] - cnt][g_pos[0]] == 2:
-                            if 'down' in where:
-                                where.remove('down')
                     except IndexError:
                         pass  # end of map
 
@@ -319,7 +320,7 @@ class Bomb(Wall):
                         self.parent.add_widget(fire_right)
                         self.parent.remove_widget(i[r])
                         self.clear(i, r)
-                    elif ((g_pos[0] - cnt == i[r].place[0]) and
+                    if ((g_pos[0] - cnt == i[r].place[0]) and
                             (g_pos[1] == i[r].place[1]) and
                             ('left' in where)):
                         where.remove('left')
@@ -332,7 +333,7 @@ class Bomb(Wall):
                         self.parent.add_widget(fire_left)
                         self.parent.remove_widget(i[r])
                         self.clear(i, r)
-                    elif ((g_pos[0] == i[r].place[0]) and
+                    if ((g_pos[0] == i[r].place[0]) and
                             (g_pos[1] + cnt == i[r].place[1]) and
                             ('up' in where)):
                         where.remove('up')
@@ -345,7 +346,7 @@ class Bomb(Wall):
                         self.parent.add_widget(fire_up)
                         self.parent.remove_widget(i[r])
                         self.clear(i, r)
-                    elif ((g_pos[0] == i[r].place[0]) and
+                    if ((g_pos[0] == i[r].place[0]) and
                             (g_pos[1] - cnt == i[r].place[1]) and
                             ('down' in where)):
                         where.remove('down')
@@ -358,7 +359,9 @@ class Bomb(Wall):
                         self.parent.add_widget(fire_down)
                         self.parent.remove_widget(i[r])
                         self.clear(i, r)
-                if (self.pos[1]+50*(cnt) < self.app.player.arch['size'][1] and
+
+                # check for borders and increase
+                if (self.pos[1]+50*(cnt) < self.app.player.arch['size'][1]+50 and
                         'up' in where):
                     fire_ud_up = Fire(pos=[self.pos[0],
                                            self.pos[1]+50*(cnt)],
@@ -374,7 +377,7 @@ class Bomb(Wall):
                                                self.place[1]-1*(cnt)])
                     self.parent.add_widget(fire_ud_down)
 
-                if (self.pos[0]+50*cnt < self.app.player.arch['size'][0] and
+                if (self.pos[0]+50*cnt < self.app.player.arch['size'][0]+50 and
                         'right' in where):
                     fire_lr_right = Fire(pos=[self.pos[0]+50*(cnt),
                                               self.pos[1]],

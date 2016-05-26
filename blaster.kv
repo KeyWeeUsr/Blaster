@@ -1,7 +1,5 @@
 #:kivy 1.9.2
 
-#:import dp kivy.metrics.dp
-#:import Image kivy.uix.image.Image
 <Game>:
     Level:
     Menu:
@@ -15,7 +13,7 @@
             pos: self.pos
     name: 'menu'
     GridLayout:
-        center: self.parent.center
+        pos_hint: {'center_x': 0.5, 'center_y': 0.5}
         size_hint: 0.9, 0.9
         cols: 1
         Button:
@@ -75,7 +73,8 @@
     size_hint: None, None
     size: 50, 50
     source: 'wall.png'
-    text:str(self.text)
+    text: str(self.text)
+    allow_stretch: True
     Label:
         size: root.size[0]/3, root.size[1]/3
         center: root.center

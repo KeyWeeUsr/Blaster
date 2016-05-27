@@ -6,6 +6,5 @@
   "npc":"id",
   "c_npc":5,
   "extra":"id of extra(number)",
-  "c_extra": 2,
   "boss":"boss id(number)"
 }

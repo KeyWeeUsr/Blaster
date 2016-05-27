@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Blaster
-# Version: 0.1.0
+# Version: 0.2.0
 # Copyright (C) 2016, KeyWeeUsr(Peter Badida) <keyweeusr@gmail.com>
 # License: GNU GPL v3.0
 #
@@ -60,7 +60,8 @@ class Bomber(Widget):
         super(Bomber, self).__init__(**kw)
         self.app = App.get_running_app()
         self.app.player = self
-        self.extra_pos = []
+        self.gate = None
+        self.extra = None
         self.keyboard = Window.request_keyboard(self.keyboard_close, self)
         self.keyboard.bind(on_key_down=self.on_keyboard_down)
         self.keyboard.bind(on_key_up=self.on_key_up)
@@ -77,8 +78,13 @@ class Bomber(Widget):
 
     def collide_extra(self):
         '''Collision with extra item.'''
-        if self.pos in self.extra_pos:
-            pass
+        if self.pos == self.extra.pos:
+            print 'extra'
+
+    def collide_gate(self):
+        '''Collision with gate - level end.'''
+        if self.pos == self.gate.pos:
+            print 'gate'
 
     def update_pos(self, direction):
         '''Walking function.'''
@@ -100,6 +106,7 @@ class Bomber(Widget):
                 self.pos = self.pos[0] + 50, self.pos[1]
         self.collide_npc()
         self.collide_extra()
+        self.collide_gate()
 
     def get_block(self, direction):
         '''
@@ -135,7 +142,7 @@ class Bomber(Widget):
         elif keycode[1] == 'right' or keycode[1] == 'd':
             self.update_pos('right')
         elif keycode[1] == 'spacebar':
-            self.parent.add_widget(Bomb(pos=self.pos))
+            self.parent.add_widget(Bomb(pos=self.pos, place=self.place[:]))
             # place a condition - if there is special extra,
             # you will go through bombs
             self.app.map[self.place[1]][self.place[0]] = 1
@@ -172,17 +179,30 @@ class Bonus(object):
     pass
 
 
-class Gate(object):
-    '''An exit from level'''
-    pass
-
-
 class Wall(Image):
     '''Basic block for a game - borders, columns, breakable, background.'''
     def __init__(self, **kw):
         super(Wall, self).__init__(**kw)
+        self.app = App.get_running_app()
         self.text = kw.get('text', '')
         self.place = kw.get('place', '')
+
+
+class Gate(Wall):
+    '''An exit from level'''
+    def __init__(self, **kw):
+        super(Gate, self).__init__(**kw)
+        self.source = 'gate/gate1.png'
+        self.stage = 1
+        self.gif = Clock.schedule_interval(self.sparkle, 0.15)
+
+    def sparkle(self, dt):
+        '''Changing pictures of a gate.'''
+        self.source = 'gate/gate'+str(self.stage)+'.png'
+        if self.stage == 4:
+            self.stage = 1
+        else:
+            self.stage += 1
 
 
 class Column(Wall):
@@ -204,7 +224,6 @@ class Fire(Wall):  # pun, hehe
         super(Fire, self).__init__(**kw)
         self.stage = 0
         self.dir = kw.get('dir', '')
-        self.place = kw.get('place', '')
         self.burn()
         Clock.schedule_interval(self.burn, .1)
 
@@ -235,10 +254,8 @@ class Bomb(Wall):
     '''
     def __init__(self, **kw):
         super(Bomb, self).__init__(**kw)
-        self.app = App.get_running_app()
         self.source = 'bomb1.png'
         self.time = 300
-        self.place = self.app.player.place
         self.range = kw.get('range', 3)
         self.tick = Clock.schedule_interval(self.countdown, 1)
         self.gif = Clock.schedule_interval(self.sparkle, 0.25)
@@ -278,6 +295,9 @@ class Bomb(Wall):
 
     def fire(self):
         self.parent.add_widget(Fire(pos=self.pos, place=self.place))
+
+    def kill_player(self, place):
+        print 'Game Over'
 
     def destroy(self):
         i = self.app.breakable[:]
@@ -361,37 +381,44 @@ class Bomb(Wall):
                         self.clear(i, r)
 
                 # check for borders and increase
-                if (self.pos[1]+50*(cnt) < self.app.player.arch['size'][1]+50 and
-                        'up' in where):
-                    fire_ud_up = Fire(pos=[self.pos[0],
-                                           self.pos[1]+50*(cnt)],
-                                      dir='ud' if cnt != self.range else 'up',
-                                      place=[self.place[0],
-                                             self.place[1]+1*(cnt)])
-                    self.parent.add_widget(fire_ud_up)
-                if self.pos[1]-50*(cnt) > 0 and 'down' in where:
-                    fire_ud_down = Fire(pos=[self.pos[0],
-                                             self.pos[1]-50*(cnt)],
-                                        dir='ud' if cnt != self.range else 'down',
-                                        place=[self.place[0],
-                                               self.place[1]-1*(cnt)])
-                    self.parent.add_widget(fire_ud_down)
+                pos_up = self.pos[1] + 50 * cnt
+                pos_down = self.pos[1] - 50 * cnt
+                pos_right = self.pos[0] + 50 * cnt
+                pos_left = self.pos[0] - 50 * cnt
+                border_up = self.app.player.arch['size'][1] + 50
+                border_right = self.app.player.arch['size'][0] + 50
 
-                if (self.pos[0]+50*cnt < self.app.player.arch['size'][0]+50 and
-                        'right' in where):
-                    fire_lr_right = Fire(pos=[self.pos[0]+50*(cnt),
-                                              self.pos[1]],
-                                         dir='lr' if cnt != self.range else 'right',
-                                         place=[self.place[0]+1*(cnt),
-                                                self.place[1]])
-                    self.parent.add_widget(fire_lr_right)
-                if self.pos[0]-50*(cnt) > 0 and 'left' in where:
-                    fire_lr_left = Fire(pos=[self.pos[0]-50*(cnt),
-                                             self.pos[1]],
-                                        dir='lr' if cnt != self.range else 'left',
-                                        place=[self.place[0]-1*(cnt),
-                                               self.place[1]])
-                    self.parent.add_widget(fire_lr_left)
+                if pos_up < border_up and 'up' in where:
+                    place_up = [self.place[0], self.place[1] + cnt]
+                    fire_ud = Fire(pos=[self.pos[0], pos_up],
+                                   dir='ud' if cnt != self.range else 'up',
+                                   place=place_up)
+                    self.kill_player(place_up)
+                    self.parent.add_widget(fire_ud)
+
+                if pos_down > 0 and 'down' in where:
+                    place_down = [self.place[0], self.place[1] - cnt]
+                    fire_ud = Fire(pos=[self.pos[0], pos_down],
+                                   dir='ud' if cnt != self.range else 'down',
+                                   place=place_down)
+                    self.kill_player(place_down)
+                    self.parent.add_widget(fire_ud)
+
+                if pos_right < border_right and 'right' in where:
+                    place_right = [self.place[0] + cnt, self.place[1]]
+                    fire_lr = Fire(pos=[pos_right, self.pos[1]],
+                                   dir='lr' if cnt != self.range else 'right',
+                                   place=place_right)
+                    self.kill_player(place_right)
+                    self.parent.add_widget(fire_lr)
+
+                if pos_left > 0 and 'left' in where:
+                    place_left = [self.place[0] - cnt, self.place[1]]
+                    fire_lr = Fire(pos=[pos_left, self.pos[1]],
+                                   dir='lr' if cnt != self.range else 'left',
+                                   place=place_left)
+                    self.kill_player(place_left)
+                    self.parent.add_widget(fire_lr)
                 cnt += 1
             else:
                 self.clear(i, 'purge')
@@ -488,30 +515,45 @@ class Level(Screen):
                 elif not (h+1) % 2 and not (w+1) % 2:
                     # unbreakable blocks(columns)
                     self.app.map[h][w] = 2
+        self.spawn('gate')
+        self.spawn('extra')
         self.spawn('npc', arch['c_npc'])
-        self.spawn('extra', arch['c_extra'])
 
     def roll(self, percent=20):
         '''Simple random counter'''
         return random.randrange(100) < percent
 
-    def spawn(self, what, count):
+    def spawn(self, what, count=1):
         breakable = self.app.breakable[:]
         if what == 'gate':
-            pass
+            random.shuffle(self.app.breakable)
+            x, y = self.app.breakable.pop().place
+            gate_pos = [50 + 50 * x, 50 + 50 * y]
+            gate = Gate(pos=gate_pos, place=[x, y])
+            wall = Wall(pos=gate_pos, place=[x, y])
+            self.app.map[y][x] = 1
+            self.app.breakable.append(wall)
+            self.app.player.gate = gate
+            self.ids.lvlwindow.add_widget(gate)
+            self.ids.lvlwindow.add_widget(wall)
         elif what == 'extra':
-            for i in xrange(count):
-                random.shuffle(self.app.breakable)
-                x, y = self.app.breakable.pop().place
+            random.shuffle(self.app.breakable)
+            while True:
+                temp = self.app.breakable.pop()
+                x, y = temp.place
                 extra_pos = [50 + 50 * x, 50 + 50 * y]
-                extra = Wall(pos=extra_pos, color=[0, 1, 0, 1], place=[x, y])
-                wall = Wall(pos=extra_pos, place=[x, y])
-                self.app.map[y][x] = 1
-                self.app.breakable.append(wall)
-                self.app.player.extra_pos.append(extra_pos)
-                self.ids.lvlwindow.add_widget(extra)
-                self.ids.lvlwindow.add_widget(wall)
-            del breakable
+                if extra_pos != self.app.player.gate.pos:
+                    break
+                else:
+                    if temp not in self.app.breakable:
+                        self.app.breakable.append(temp)
+            extra = Wall(pos=extra_pos, color=[0, 1, 0, 1], place=[x, y])
+            wall = Wall(pos=extra_pos, place=[x, y])
+            self.app.map[y][x] = 1
+            self.app.breakable.append(wall)
+            self.app.player.extra = extra
+            self.ids.lvlwindow.add_widget(extra)
+            self.ids.lvlwindow.add_widget(wall)
         elif what == 'npc':
             # append to touchable
             pass

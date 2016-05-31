@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Blaster
-# Version: 0.2.0
+# Version: 0.3.0
 # Copyright (C) 2016, KeyWeeUsr(Peter Badida) <keyweeusr@gmail.com>
 # License: GNU GPL v3.0
 #
@@ -24,6 +24,9 @@
 import json
 import random
 import os.path as op
+from os import listdir
+from functools import partial
+
 from kivy import require
 from kivy.app import App
 from kivy.clock import Clock
@@ -52,29 +55,65 @@ class Game(ScreenManager):
         self.current = 'menu'
 
 
-class Bomber(Widget):
+class Wall(Image):
+    '''Basic block for a game - borders, columns, breakable, background.'''
+    def __init__(self, **kw):
+        super(Wall, self).__init__(**kw)
+        self.app = App.get_running_app()
+        self.text = kw.get('text', '')
+        self.place = kw.get('place', '')
+
+
+class Bomber(Wall):
     '''Player with stats. Always spawns at [0, 0].'''
-    place = [0, 0]
 
     def __init__(self, **kw):
         super(Bomber, self).__init__(**kw)
         self.app = App.get_running_app()
         self.app.player = self
         self.gate = None
+        self.move_dt = 0
         self.extra = None
+        self.place = [0, 0]
+        self.move_clock = None
+        self.bombwalking = False
+        self.default_pos = [50, 50]
         self.keyboard = Window.request_keyboard(self.keyboard_close, self)
         self.keyboard.bind(on_key_down=self.on_keyboard_down)
         self.keyboard.bind(on_key_up=self.on_key_up)
+        self.move()
 
-    def reset(self):
+    def die(self):
+        print 'dead'
+        return
+        # still incomplete
+        self.reset_stats()
+        self.app.level.reset_level()
+
+    def reset_stats(self):
         '''Reset stats here - e.g. death, level reset, etc.'''
+        # save highscore, last level to stats.json
+        self.gate = None
+        self.extra = None
+        self.place = [0, 0]
+        self.pos = self.default_pos
+        self.bombwalking = False
+        self.source = 'stand1.png'
+        self.move_clock = None
+        self.move_dt = 0
+        # # reset level: - do in Level class
+        # self.app.map
+        # self.app.breakable
+        # self.app.touchable
+        # container.scroll_x&scroll_y = 0
+        # remove from self.app.level.ids.lvlwindow everything except Bomber
         pass
 
     def collide_npc(self):
         '''Collision with npc i.e. death handling.'''
         for t in self.app.touchable:
             if t.place == self.place:
-                pass
+                self.die()
 
     def collide_extra(self):
         '''Collision with extra item.'''
@@ -86,24 +125,47 @@ class Bomber(Widget):
         if self.pos == self.gate.pos:
             print 'gate'
 
+    def get_movement(self, direction, dt):
+        self.move_dt += dt
+        if self.move_dt > 1:
+            Clock.unschedule(self.move_clock)
+            self.move_dt = 0
+            self.move()
+            return
+        if direction not in self.source:
+            self.source = direction+'1.png'
+        stage = int(self.source.replace(direction, '').replace('.png', ''))
+        if stage != 2:
+            self.source = direction + str(stage+1) + '.png'
+        else:
+            self.source = direction + '1.png'
+
+    def move(self, direction='stand'):
+        if self.move_clock:
+            Clock.unschedule(self.move_clock)
+        self.move_clock = partial(self.get_movement, direction)
+        Clock.schedule_interval(self.move_clock, .15)
+
     def update_pos(self, direction):
         '''Walking function.'''
-        if direction == 'up':
-            if self.pos[1] < self.arch['size'][1] and self.get_block('up'):
+        self.move(direction)
+        if direction == 'up' and self.pos[1] < self.arch['size'][1]:
+            if self.get_block(direction):
                 self.place[1] += 1
                 self.pos = self.pos[0], self.pos[1] + 50
-        elif direction == 'down':
-            if self.pos[1] > 50 and self.get_block('down'):
+        elif direction == 'down' and self.pos[1] > 50:
+            if self.get_block(direction):
                 self.place[1] -= 1
                 self.pos = self.pos[0], self.pos[1] - 50
-        elif direction == 'left':
-            if self.pos[0] > 50 and self.get_block('left'):
+        elif direction == 'left' and self.pos[0] > 50:
+            if self.get_block(direction):
                 self.place[0] -= 1
                 self.pos = self.pos[0] - 50, self.pos[1]
-        elif direction == 'right':
-            if self.pos[0] < self.arch['size'][0] and self.get_block('right'):
+        elif direction == 'right' and self.pos[0] < self.arch['size'][0]:
+            if self.get_block(direction):
                 self.place[0] += 1
                 self.pos = self.pos[0] + 50, self.pos[1]
+        self.app.level.ids.container.scroll_to(self, padding=160)
         self.collide_npc()
         self.collide_extra()
         self.collide_gate()
@@ -137,15 +199,17 @@ class Bomber(Widget):
             self.update_pos('up')
         elif keycode[1] == 'down' or keycode[1] == 's':
             self.update_pos('down')
+            self.move('down')
         elif keycode[1] == 'left' or keycode[1] == 'a':
             self.update_pos('left')
+            self.move('left')
         elif keycode[1] == 'right' or keycode[1] == 'd':
             self.update_pos('right')
+            self.move('right')
         elif keycode[1] == 'spacebar':
             self.parent.add_widget(Bomb(pos=self.pos, place=self.place[:]))
-            # place a condition - if there is special extra,
-            # you will go through bombs
-            self.app.map[self.place[1]][self.place[0]] = 1
+            if not self.bombwalking:
+                self.app.map[self.place[1]][self.place[0]] = 1
         elif keycode[1] == 'enter':
             pass
         elif keycode[1] == 'escape':
@@ -166,11 +230,6 @@ class Bomber(Widget):
             pass
 
 
-class Monster(object):
-    '''Monster instance. Will take form&stats from json(probably).'''
-    pass
-
-
 class Bonus(object):
     '''
     An item which will spawn in a wall and will be highlighted
@@ -179,13 +238,21 @@ class Bonus(object):
     pass
 
 
-class Wall(Image):
-    '''Basic block for a game - borders, columns, breakable, background.'''
+class Monster(Wall):
+    '''Monster instance. Will take form&stats from json(probably).'''
     def __init__(self, **kw):
-        super(Wall, self).__init__(**kw)
-        self.app = App.get_running_app()
-        self.text = kw.get('text', '')
-        self.place = kw.get('place', '')
+        super(Monster, self).__init__(**kw)
+        self.source = 'a1.png'
+        self.stage = 1
+        self.gif = Clock.schedule_interval(self.sparkle, 0.15)
+
+    def sparkle(self, dt):
+        '''Changing pictures of a gate.'''
+        self.source = 'a'+str(self.stage)+'.png'
+        if self.stage == 2:
+            self.stage = 1
+        else:
+            self.stage += 1
 
 
 class Gate(Wall):
@@ -228,6 +295,9 @@ class Fire(Wall):  # pun, hehe
         Clock.schedule_interval(self.burn, .1)
 
     def burn(self, dt=0):
+        # kill player staying on the bomb
+        # if self.place == self.app.player.place:
+        #     self.app.player.die()
         if self.stage == 6:
             Clock.unschedule(self.burn)
             self.parent.remove_widget(self)
@@ -297,7 +367,8 @@ class Bomb(Wall):
         self.parent.add_widget(Fire(pos=self.pos, place=self.place))
 
     def kill_player(self, place):
-        print 'Game Over'
+        if self.app.player.place == place:
+            self.app.player.die()
 
     def destroy(self):
         i = self.app.breakable[:]
@@ -435,22 +506,43 @@ class Level(Screen):
         self.app.level = self
         self.app.breakable = []  # Walls
         self.app.touchable = []  # NPC
+        self.stats = None
+        self.hashes = None
         self.texture = Image(source='grass.png').texture
         self.texture.wrap = 'repeat'
 
-    def load_level(self, start=False):
-        '''Json loading'''
-        if not op.exists(self.path+'/stats.json'):
-            stats = {'level': 1}
-            level = 1
-            with open(self.path+'/stats.json', 'w') as f:
-                f.write(json.dumps(stats))
+    def create_hashes(self):
+        if not op.exists(self.app.user_data_dir+'/hash.tiff'):
+            from hashlib import md5
+            self.hashes = []
+            for i in listdir(self.app.path+'/levels'):
+                with open(self.app.path+'/levels/'+i) as f:
+                    passw = str(md5(f.read()).hexdigest()).upper()[:8]
+                    self.hashes.append(passw)
+            with open(self.app.user_data_dir+'/hash.tiff', 'w') as f:
+                f.write('\n'.join(self.hashes))
         else:
-            with open(self.path+'/stats.json') as f:
-                level = json.load(f)['level']
-        with open(self.path+'/levels/'+str(level)+'.json') as f:
-            self.set_level(json.load(f))
-            self.manager.current = 'level'
+            with open(self.app.user_data_dir+'/hash.tiff') as f:
+                self.hashes = f.read().split('\n')
+
+    def load_level(self, start=False, password=None):
+        '''Json loading'''
+        if not op.exists(self.app.user_data_dir+'/stats.json'):
+            self.stats = {'highscore': 0, 'last_level': 0}
+            with open(self.app.user_data_dir+'/stats.json', 'w') as f:
+                f.write(json.dumps(self.stats))
+        else:
+            with open(self.app.user_data_dir+'/stats.json') as f:
+                self.stats = json.load(f)
+        self.create_hashes()
+        if not password:
+            with open(self.path+'/levels/1.json') as f:
+                self.set_level(json.load(f))
+                self.manager.current = 'level'
+        else:
+            with open(self.path+'/levels/'+str(level)+'.json') as f:
+                self.set_level(json.load(f))
+                self.manager.current = 'level'
 
     def create_borders(self, arch):
         # border size
@@ -517,14 +609,13 @@ class Level(Screen):
                     self.app.map[h][w] = 2
         self.spawn('gate')
         self.spawn('extra')
-        self.spawn('npc', arch['c_npc'])
+        self.spawn_npc(arch['npc'], arch['c_npc'], arch['size'])
 
     def roll(self, percent=20):
         '''Simple random counter'''
         return random.randrange(100) < percent
 
     def spawn(self, what, count=1):
-        breakable = self.app.breakable[:]
         if what == 'gate':
             random.shuffle(self.app.breakable)
             x, y = self.app.breakable.pop().place
@@ -554,11 +645,27 @@ class Level(Screen):
             self.app.player.extra = extra
             self.ids.lvlwindow.add_widget(extra)
             self.ids.lvlwindow.add_widget(wall)
-        elif what == 'npc':
-            # append to touchable
-            pass
         elif what == 'boss':
             pass
+
+    def spawn_npc(self, type=None, count=0, borders=None):
+        while count > 0:
+            x = random.randint(0, borders[0]/50-1)
+            y = random.randint(0, borders[1]/50-1)
+            pos_x, pos_y = [i*50+50 for i in [x, y]]
+            for b in self.app.breakable:
+                if not [x, y] == b.place and not self.app.map[y][x] >= 1:
+                    if [x, y] == [0, 0]:
+                        break
+                    npc = Monster(pos=[pos_x, pos_y],
+                                  place=[x, y])
+                    self.app.touchable.append(npc)
+                    self.ids.lvlwindow.add_widget(npc)
+                    count -= 1
+                    break
+
+    def reset_level(self):
+        pass
 
 
 class Menu(Screen):

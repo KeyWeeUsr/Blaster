@@ -4,14 +4,19 @@
 <Game>:
     Level:
     Menu:
+    GameOver:
+    LevelDone:
+
 <Menu>:
     ## placeholder for background image
     canvas:
         Color:
             rgba: 0, 0, 0, 1
+
         Rectangle:
             size: self.size
             pos: self.pos
+
     name: 'menu'
     GridLayout:
         pos_hint: {'center_x': 0.5, 'center_y': 0.5}
@@ -20,20 +25,29 @@
         Button:
             text: 'Play'
             on_release: root.start_game()
+
         Button:
             text: 'Instructions'
+
         Button:
             text: 'Settings'
+
         Button:
             text: 'Password'
+
         Button:
             text: 'Exit'
             on_release: exit()
+
         Label:
             text: 'KeyWeeUsr, https://github.com/KeyWeeUsr'
+
 <Instructions@Screen>:
+
 <GSettings@Screen>:
+
 <Password@Screen>:
+
 <Level>:
     name: 'level'
     BoxLayout:
@@ -43,30 +57,27 @@
             height: '50dp'
             Label:
                 text: 'Life'
+
             Label:
                 text: 'Time'
+
             Label:
                 text: 'Score'
+
         ScrollView:
             scroll_x: 0
             scroll_y: 0
             id: container
             Widget:
-                canvas:
-                    Rectangle:
-                        texture: root.texture
-                        size: self.size
-                        pos: self.pos
-                        tex_coords:
-                            [0, 0, self.width/50, 0, self.width/50,
-                            self.height/50, 0, self.height/50]
                 id: lvlwindow
                 Bomber:
+
         BoxLayout:
             id: gamepad
             size_hint_y: None
             height: '150dp' if platform == 'android' else 0
-<Wall>:
+
+<Block>:
     size_hint: None, None
     size: 50, 50
     source: 'wall.png'
@@ -76,6 +87,33 @@
         size: root.size[0]/3, root.size[1]/3
         center: root.center
         text: root.text
+
 <Bomber>:
     pos: 50, 50
     source: 'stand1.png'
+
+<GameOver@Screen>:
+    name: 'gameover'
+    BoxLayout:
+        orientation: 'vertical'
+        Label:
+            text: 'Game over!'
+
+        Button:
+            text: 'Reset!'
+            on_release: app.level.load_level()
+
+        Button:
+            text: 'Back to menu'
+            on_release: root.manager.current = 'menu'
+
+<LevelDone@Screen>:
+    name: 'lvldone'
+    BoxLayout:
+        orientation: 'vertical'
+        Label:
+            text: 'New Level!'
+
+        Button:
+            text: 'Continue'
+            on_release: app.level.load_level()
